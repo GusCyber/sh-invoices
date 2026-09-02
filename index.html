@@ -181,6 +181,9 @@
     <input id="bizEmail" />
     <label>Next invoice number</label>
     <input id="nextNo" type="number" min="1" />
+    <label>Google Sheets Web App URL</label>
+    <input id="sheetUrl" placeholder="https://script.google.com/macros/s/..../exec" />
+    <div class="hint">Paste the Apps Script deployment URL. Each invoice is appended as a new row.</div>
     <button class="btn-navy" style="width:100%;margin-top:14px" onclick="saveSettings()">Save</button>
     <button class="btn-ghost" onclick="document.getElementById('settings').close()">Close</button>
   </dialog>
@@ -203,6 +206,7 @@ function loadSettings() {
   $("owner").value = s.owner || "";
   $("bizPhone").value = s.bizPhone || "";
   $("bizEmail").value = s.bizEmail || "superheadlight@gmail.com";
+  $("sheetUrl").value = s.sheetUrl || "";
   const n = Number(localStorage.getItem("sh_inv") || "1");
   $("nextNo").value = n;
   $("nextInv").textContent = "Next invoice: SH-" + String(n).padStart(3, "0");
@@ -211,7 +215,8 @@ function saveSettings() {
   localStorage.setItem("sh_settings", JSON.stringify({
     owner: $("owner").value.trim(),
     bizPhone: $("bizPhone").value.trim(),
-    bizEmail: $("bizEmail").value.trim()
+    bizEmail: $("bizEmail").value.trim(),
+    sheetUrl: $("sheetUrl").value.trim()
   }));
   localStorage.setItem("sh_inv", String(Math.max(1, Number($("nextNo").value || 1))));
   loadSettings();
@@ -268,8 +273,37 @@ function collect() {
     notes: $("notes").value.trim(),
     owner: s.owner || "Sole proprietor",
     bizPhone: s.bizPhone || "",
-    bizEmail: s.bizEmail || "superheadlight@gmail.com"
+    bizEmail: s.bizEmail || "superheadlight@gmail.com",
+    sheetUrl: s.sheetUrl || ""
   };
+}
+
+function saveToSheet(d) {
+  if (!d.sheetUrl) return Promise.resolve(false);
+  const payload = {
+    date: d.date,
+    invoice: d.code,
+    customer: d.client,
+    phone: d.phone,
+    vehicle: d.vehicle,
+    size: d.size,
+    address: d.address,
+    list: d.list,
+    discount: d.disc,
+    total: d.total,
+    payment: d.pay,
+    status: d.status,
+    notes: d.notes
+  };
+  return fetch(d.sheetUrl, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(payload)
+  }).then(() => true).catch(() => {
+    const q = new URLSearchParams(payload);
+    return fetch(d.sheetUrl + "?" + q.toString(), { mode: "no-cors" }).then(() => true).catch(() => false);
+  });
 }
 
 function buildPdf(d) {
@@ -381,7 +415,9 @@ async function makePdf(sendWa) {
 
   localStorage.setItem("sh_inv", String(d.n + 1));
   loadSettings();
-  flash(d.code + " ready");
+  saveToSheet(d).then((ok) => {
+    flash(d.code + " ready" + (d.sheetUrl ? (ok ? " · saved to Sheets" : " · Sheets failed") : ""));
+  });
 
   const text =
 `Super Headlights Restoration
