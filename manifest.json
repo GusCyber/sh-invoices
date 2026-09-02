@@ -1,0 +1,9 @@
+{
+  "name": "Super Headlights Invoices",
+  "short_name": "SH Invoices",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0F2744",
+  "theme_color": "#0F2744",
+  "lang": "en"
+}
